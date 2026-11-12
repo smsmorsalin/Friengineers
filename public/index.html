@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Friengineers — a collective of friends and engineers building reliable, modern, fast & secure software. Engineered by friends, built on trust." />
+  <meta name="theme-color" content="#070b16" />
+  <title>Friengineers — Engineered by Friends, Built on Trust</title>
+
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <!-- Progress & ambient FX -->
+  <div class="scroll-progress" id="scrollProgress" aria-hidden="true"></div>
+  <div class="cursor-glow" id="cursorGlow" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
+
+  <!-- ============================= NAV ============================= -->
+  <nav class="nav" id="nav">
+    <div class="nav-inner container">
+      <a class="brand" href="#home">
+        <span class="brand-mark" id="brandMark">F</span>
+        <span class="brand-name" id="brandName">Friengineers</span>
+      </a>
+
+      <ul class="nav-links" id="navLinks">
+        <li><a href="#home" class="active">Home</a></li>
+        <li><a href="#about">About</a></li>
+        <li><a href="#services">Services</a></li>
+        <li><a href="#projects">Projects</a></li>
+        <li><a href="#team">Team</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ul>
+
+      <div class="nav-cta">
+        <a href="#contact" class="btn btn-sm btn-primary">Start a Project</a>
+        <button class="nav-toggle" id="navToggle" aria-label="Toggle menu" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ============================= HERO ============================= -->
+  <header class="hero" id="home">
+    <canvas class="hero-canvas" id="particles" aria-hidden="true"></canvas>
+    <div class="hero-glow hero-glow-1" aria-hidden="true"></div>
+    <div class="hero-glow hero-glow-2" aria-hidden="true"></div>
+
+    <div class="hero-inner container">
+      <div class="hero-badge reveal">
+        <span class="pulse-dot" aria-hidden="true"></span>
+        <span id="heroBadge">Building the future, together</span>
+      </div>
+
+      <h1 class="hero-title" id="heroTitle">
+        We build <span class="grad">reliable, modern, fast &amp; secure</span> systems.
+      </h1>
+
+      <p class="hero-sub reveal" id="heroSub">
+        Friengineers is a collective of friends and engineers crafting dependable software that moves businesses forward — engineered with care, delivered with trust.
+      </p>
+
+      <div class="hero-actions reveal">
+        <a href="#contact" class="btn btn-primary btn-lg" id="heroPrimary">Start a Project</a>
+        <a href="#services" class="btn btn-ghost btn-lg" id="heroSecondary">See What We Do</a>
+      </div>
+
+      <div class="hero-stats" id="heroStats"><!-- rendered by JS --></div>
+
+      <a class="scroll-hint" href="#about" aria-label="Scroll to about">
+        <span class="mouse"><span class="wheel"></span></span>
+        <span class="scroll-label">Scroll</span>
+      </a>
+    </div>
+  </header>
+
+  <main>
+    <!-- ============================= ABOUT ============================= -->
+    <section class="section" id="about">
+      <div class="container">
+        <div class="section-head reveal">
+          <span class="eyebrow">Who we are</span>
+          <h2 class="section-title" id="aboutHeading">Who We Are</h2>
+          <p class="section-sub" id="aboutSub">A trusted crew of friends turned engineers, building software the right way.</p>
+        </div>
+
+        <div class="about-grid">
+          <div class="about-story reveal">
+            <div class="about-card glass">
+              <div class="about-icon" id="aboutIcon"></div>
+              <p class="story" id="aboutStory"></p>
+            </div>
+            <div class="about-mv">
+              <div class="mv-card glass reveal">
+                <h4><span class="mv-tag mv-mission">Mission</span></h4>
+                <p id="aboutMission"></p>
+              </div>
+              <div class="mv-card glass reveal">
+                <h4><span class="mv-tag mv-vision">Vision</span></h4>
+                <p id="aboutVision"></p>
+              </div>
+            </div>
+          </div>
+
+          <div class="values-grid" id="valuesGrid"><!-- rendered by JS --></div>
+        </div>
+
+        <div class="timeline" id="timeline"><!-- rendered by JS --></div>
+      </div>
+    </section>
+
+    <!-- ============================= SERVICES ============================= -->
+    <section class="section section-alt" id="services">
+      <div class="container">
+        <div class="section-head reveal">
+          <span class="eyebrow">What we do</span>
+          <h2 class="section-title" id="servicesHeading">What We Do</h2>
+          <p class="section-sub" id="servicesSub">Full-stack engineering services, delivered with discipline.</p>
+        </div>
+
+        <div class="services-grid" id="servicesGrid"><!-- rendered by JS --></div>
+      </div>
+    </section>
+
+    <!-- ============================= PROJECTS ============================= -->
+    <section class="section" id="projects">
+      <div class="container">
+        <div class="section-head reveal">
+          <span class="eyebrow">Portfolio</span>
+          <h2 class="section-title" id="projectsHeading">What We're Building</h2>
+          <p class="section-sub" id="projectsSub">Projects we're proud of — and the ones coming next.</p>
+        </div>
+
+        <div class="projects-grid" id="projectsGrid"><!-- rendered by JS --></div>
+      </div>
+    </section>
+
+    <!-- ============================= TEAM ============================= -->
+    <section class="section section-alt" id="team">
+      <div class="container">
+        <div class="section-head reveal">
+          <span class="eyebrow">The people</span>
+          <h2 class="section-title" id="teamHeading">The People</h2>
+          <p class="section-sub" id="teamSub">Friends first, engineers always — the crew behind Friengineers.</p>
+        </div>
+
+        <div class="team-grid" id="teamGrid"><!-- rendered by JS --></div>
+      </div>
+    </section>
+
+    <!-- ============================= CONTACT ============================= -->
+    <section class="section" id="contact">
+      <div class="container">
+        <div class="section-head reveal">
+          <span class="eyebrow">Contact</span>
+          <h2 class="section-title" id="contactHeading">Let's Build Together</h2>
+          <p class="section-sub" id="contactSub">Tell us about your project. We'll respond within one business day.</p>
+        </div>
+
+        <div class="contact-grid">
+          <div class="contact-info reveal">
+            <div class="info-card glass">
+              <div class="info-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+              </div>
+              <div>
+                <h4>Visit Us</h4>
+                <p id="contactAddress">Bashundhara R/A, Dhaka, Bangladesh</p>
+              </div>
+            </div>
+            <div class="info-card glass">
+              <div class="info-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="m3 6 9 7 9-7"/></svg>
+              </div>
+              <div>
+                <h4>Email Us</h4>
+                <p><a href="mailto:the.friengineers.org@gmail.com" id="contactEmail">the.friengineers.org@gmail.com</a></p>
+              </div>
+            </div>
+            <div class="info-card glass">
+              <div class="info-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .7 2.9a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c1 .3 2 .6 3 .7a2 2 0 0 1 1.6 2Z"/></svg>
+              </div>
+              <div>
+                <h4>Call Us</h4>
+                <p id="contactPhone">+880 1XXX-XXXXXX</p>
+              </div>
+            </div>
+            <div class="info-card glass">
+              <div class="info-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              </div>
+              <div>
+                <h4>Working Hours</h4>
+                <p id="contactHours">Sun – Fri, 9:00 AM – 7:00 PM</p>
+              </div>
+            </div>
+          </div>
+
+          <form class="contact-form glass reveal" id="contactForm" novalidate>
+            <h3 id="contactFormTitle">Send us a message</h3>
+            <div class="form-row">
+              <div class="field">
+                <label for="cf-name">Your Name *</label>
+                <input type="text" id="cf-name" name="name" placeholder="Full name" required />
+              </div>
+              <div class="field">
+                <label for="cf-email">Email *</label>
+                <input type="email" id="cf-email" name="email" placeholder="you@example.com" required />
+              </div>
+            </div>
+            <div class="field">
+              <label for="cf-subject">Subject</label>
+              <input type="text" id="cf-subject" name="subject" placeholder="What's this about?" />
+            </div>
+            <div class="field">
+              <label for="cf-message">Message *</label>
+              <textarea id="cf-message" name="message" rows="5" placeholder="Tell us about your project..." required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block" id="contactSubmit">
+              <span class="btn-label">Send Message</span>
+              <span class="btn-spinner" aria-hidden="true"></span>
+            </button>
+            <p class="form-status" id="contactStatus" role="status"></p>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============================= FOOTER ============================= -->
+  <footer class="footer" id="footer">
+    <div class="container">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <a class="brand" href="#home">
+            <span class="brand-mark">F</span>
+            <span class="brand-name">Friengineers</span>
+          </a>
+          <p id="footerAbout">Friengineers is a collective of friends and engineers building reliable, modern, fast, and secure software.</p>
+        </div>
+
+        <div class="footer-col">
+          <h4 id="footerLinksTitle">Quick Links</h4>
+          <ul>
+            <li><a href="#home">Home</a></li>
+            <li><a href="#about">About</a></li>
+            <li><a href="#services">Services</a></li>
+            <li><a href="#projects">Projects</a></li>
+            <li><a href="#contact">Contact</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4 id="footerServicesTitle">Services</h4>
+          <ul id="footerServices"><!-- rendered by JS --></ul>
+        </div>
+
+        <div class="footer-col">
+          <h4 id="footerContactTitle">Contact</h4>
+          <ul class="footer-contact">
+            <li id="footerAddress">Bashundhara R/A, Dhaka, Bangladesh</li>
+            <li><a href="mailto:the.friengineers.org@gmail.com" id="footerEmail">the.friengineers.org@gmail.com</a></li>
+            <li id="footerHours">Sun – Fri, 9:00 AM – 7:00 PM</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <p id="footerCopyright">© <span data-year>2026</span> Friengineers. All rights reserved.</p>
+        <a href="/admin.html" class="admin-link" title="Content management">Admin</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/js/main.js"></script>
+</body>
+</html>

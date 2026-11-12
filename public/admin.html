@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Friengineers — Admin</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/admin.css" />
+</head>
+<body>
+  <!-- ============================ LOGIN ============================ -->
+  <div class="login-screen" id="loginScreen">
+    <div class="login-card">
+      <div class="login-logo">F</div>
+      <h1>Friengineers</h1>
+      <p class="login-sub">Content Management</p>
+
+      <form id="loginForm" novalidate>
+        <div class="field">
+          <label for="loginUsername">Username</label>
+          <input type="text" id="loginUsername" autocomplete="username" placeholder="admin" required />
+        </div>
+        <div class="field">
+          <label for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" autocomplete="current-password" placeholder="••••••••" required />
+        </div>
+        <p class="login-error" id="loginError" role="alert"></p>
+        <button type="submit" class="btn btn-primary btn-block" id="loginBtn">
+          <span class="btn-label">Sign In</span>
+          <span class="btn-spinner" aria-hidden="true"></span>
+        </button>
+      </form>
+
+      <p class="login-hint">Default: admin / friengineers@2026<br/>Change it after first login.</p>
+      <a class="back-link" href="/">← Back to site</a>
+    </div>
+  </div>
+
+  <!-- ============================ DASHBOARD ============================ -->
+  <div class="app" id="app" hidden>
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-head">
+        <div class="logo-mark">F</div>
+        <div>
+          <div class="logo-name">Friengineers</div>
+          <div class="logo-sub">Admin Panel</div>
+        </div>
+      </div>
+
+      <nav class="side-nav">
+        <div class="side-label">Content</div>
+        <a href="#" data-view="hero" class="active"><span class="ic">◆</span> Hero</a>
+        <a href="#" data-view="about"><span class="ic">◆</span> About</a>
+        <a href="#" data-view="services"><span class="ic">◆</span> Services</a>
+        <a href="#" data-view="projects"><span class="ic">◆</span> Projects</a>
+        <a href="#" data-view="team"><span class="ic">◆</span> Team</a>
+        <a href="#" data-view="contact"><span class="ic">◆</span> Contact</a>
+        <a href="#" data-view="footer"><span class="ic">◆</span> Footer</a>
+
+        <div class="side-label">Manage</div>
+        <a href="#" data-view="messages"><span class="ic">✉</span> Messages <span class="badge" id="msgBadge" hidden>0</span></a>
+        <a href="#" data-view="settings"><span class="ic">⚙</span> Settings</a>
+      </nav>
+
+      <div class="sidebar-foot">
+        <a href="/" target="_blank" rel="noopener" class="foot-link">View Site ↗</a>
+        <button id="logoutBtn" class="foot-link logout">Log Out</button>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+      <header class="topbar">
+        <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">☰</button>
+        <div>
+          <h1 id="viewTitle">Edit Hero</h1>
+          <p id="viewSub" class="topbar-sub">Update the hero section of the homepage.</p>
+        </div>
+        <div class="topbar-actions">
+          <span class="save-state" id="saveState"></span>
+          <button class="btn btn-primary btn-sm" id="saveBtn">Save Changes</button>
+        </div>
+      </header>
+
+      <div class="content" id="content"><!-- rendered by JS --></div>
+    </main>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast" role="status"></div>
+
+  <script src="/js/admin.js"></script>
+</body>
+</html>
