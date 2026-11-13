@@ -34,7 +34,19 @@ Requires **Python 3.8+**. No `pip install` needed.
 
 ```bash
 cd friengineers
+# Configure a unique administrator password before the first start.
+export FRIENGINEERS_ADMIN_USER=admin
+export FRIENGINEERS_ADMIN_PASSWORD='replace-with-a-unique-password-of-12-or-more-characters'
 python3 run.py
+```
+
+On Windows PowerShell, set the same values in the server's environment before
+running `python run.py`:
+
+```powershell
+$env:FRIENGINEERS_ADMIN_USER = "admin"
+$env:FRIENGINEERS_ADMIN_PASSWORD = "your-private-unique-password"
+python run.py
 ```
 
 
@@ -46,21 +58,19 @@ Then open:
 | Admin panel     | http://localhost:8080/admin.html |
 | API             | http://localhost:8080/api/content |
 
-### Default admin login
+### Administrator login
 
-```
-username: admin
-password: friengineers@2026
-```
-
-> ⚠️ **Change this password immediately** from the admin panel → Settings.
+Set `FRIENGINEERS_ADMIN_USER` and `FRIENGINEERS_ADMIN_PASSWORD` before the
+first start. Keep the password private and use a unique value of 12 or more
+characters. Existing databases with the old bundled password must set
+`FRIENGINEERS_ADMIN_PASSWORD` once to rotate it at startup.
 
 ---
 
 ## 🛠 Running Options
 
 ```bash
-python3 run.py                # default: 0.0.0.0:8080
+python3 run.py                # default: 127.0.0.1:8080 (local only)
 python3 run.py --port 9000    # custom port
 python3 run.py --host 127.0.0.1   # localhost only
 python3 run.py --reset        # reset database to default content
