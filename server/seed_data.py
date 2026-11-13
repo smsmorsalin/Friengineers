@@ -9,10 +9,12 @@ To edit any of this content later, either:
   2. Update the database directly with the bundled CLI tool (server/cli.py).
 """
 
+import os
+
 DEFAULT_ADMIN = {
-    # Default admin credentials. CHANGE THESE IMMEDIATELY after first login.
-    "username": "admin",
-    "password": "friengineers@2026",
+    # A password must be supplied through the environment for a new database.
+    "username": os.environ.get("FRIENGINEERS_ADMIN_USER", "admin").strip(),
+    "password": os.environ.get("FRIENGINEERS_ADMIN_PASSWORD", ""),
 }
 
 DEFAULT_CONTENT = {

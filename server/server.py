@@ -12,18 +12,21 @@ Serves:
 """
 
 import json
+import html
 import mimetypes
 import os
 import re
+import threading
 import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from html.parser import HTMLParser
 from pathlib import Path
 
 from . import db
 
 PUBLIC_DIR = Path(__file__).resolve().parent.parent / "public"
-HOST = os.environ.get("FRIENGINEERS_HOST", "0.0.0.0")
+HOST = os.environ.get("FRIENGINEERS_HOST", "127.0.0.1")
 PORT = int(os.environ.get("FRIENGINEERS_PORT", "8080"))
 
 # Public sections allowed to be served to the unauthenticated site.
@@ -34,34 +37,133 @@ PUBLIC_SECTIONS = {
 
 # Sections the admin panel may write to.
 EDITABLE_SECTIONS = PUBLIC_SECTIONS
+MAX_BODY_BYTES = 64 * 1024
+LOGIN_WINDOW_SECONDS = 15 * 60
+LOGIN_MAX_ATTEMPTS = 5
+_login_lock = threading.Lock()
+_login_failures = {}
+_contact_submissions = {}
+
+
+class _HeadlineSanitizer(HTMLParser):
+    """Allow only the decorative gradient span in editable hero headlines."""
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts = []
+        self.open_spans = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "span" and attrs == [("class", "grad")]:
+            self.parts.append('<span class="grad">')
+            self.open_spans += 1
+
+    def handle_endtag(self, tag):
+        if tag == "span" and self.open_spans:
+            self.parts.append("</span>")
+            self.open_spans -= 1
+
+    def handle_data(self, data):
+        self.parts.append(html.escape(data, quote=False))
+
+    def close(self):
+        super().close()
+        if self.open_spans:
+            self.parts.extend(["</span>"] * self.open_spans)
+            self.open_spans = 0
+
+
+def _sanitize_headline(value):
+    parser = _HeadlineSanitizer()
+    parser.feed(str(value))
+    parser.close()
+    return "".join(parser.parts)
 
 
 # --------------------------------------------------------------------------
 # Route table
 # --------------------------------------------------------------------------
 class Handler(BaseHTTPRequestHandler):
-    server_version = "Friengineers/1.0"
+    server_version = ""
+
+    def version_string(self):
+        return "Friengineers"
+
+    def end_headers(self):
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        self.send_header(
+            "Content-Security-Policy",
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; "
+            "object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+        )
+        super().end_headers()
 
     # -- helpers ------------------------------------------------------------
-    def _send_json(self, status: int, payload) -> None:
+    def _send_json(self, status: int, payload, headers=None) -> None:
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
-        self.send_header("X-Content-Type-Options", "nosniff")
+        for name, value in (headers or {}).items():
+            self.send_header(name, value)
         self.end_headers()
         self.wfile.write(data)
 
     def _read_json(self):
-        length = int(self.headers.get("Content-Length", 0) or 0)
+        try:
+            length = int(self.headers.get("Content-Length", 0) or 0)
+        except (TypeError, ValueError):
+            raise ValueError("Invalid Content-Length")
+        if length < 0:
+            raise ValueError("Invalid Content-Length")
+        if length > MAX_BODY_BYTES:
+            raise OverflowError("Request body is too large")
         if length == 0:
             return {}
         raw = self.rfile.read(length)
         try:
-            return json.loads(raw.decode("utf-8"))
-        except json.JSONDecodeError:
+            body = json.loads(raw.decode("utf-8"))
+            return body if isinstance(body, dict) else None
+        except (json.JSONDecodeError, UnicodeDecodeError):
             return None
+
+    def _login_rate_limited(self, record_failure=False, success=False):
+        ip = self.client_address[0]
+        now = time.time()
+        with _login_lock:
+            attempts = [t for t in _login_failures.get(ip, []) if now - t < LOGIN_WINDOW_SECONDS]
+            if success:
+                _login_failures.pop(ip, None)
+                return False, 0
+            if record_failure:
+                attempts.append(now)
+            _login_failures[ip] = attempts
+            if len(_login_failures) > 10000:
+                for key, times in list(_login_failures.items()):
+                    if not times or now - times[-1] >= LOGIN_WINDOW_SECONDS:
+                        _login_failures.pop(key, None)
+            if len(attempts) >= LOGIN_MAX_ATTEMPTS:
+                return True, max(1, int(LOGIN_WINDOW_SECONDS - (now - attempts[0])))
+            return False, 0
+
+    def _contact_rate_limited(self):
+        now = time.time()
+        ip = self.client_address[0]
+        with _login_lock:
+            recent = [t for t in _contact_submissions.get(ip, []) if now - t < 600]
+            if len(recent) >= 5:
+                return True, max(1, int(600 - (now - recent[0])))
+            recent.append(now)
+            _contact_submissions[ip] = recent
+            if len(_contact_submissions) > 10000:
+                for key, times in list(_contact_submissions.items()):
+                    if not times or now - times[-1] >= 600:
+                        _contact_submissions.pop(key, None)
+            return False, 0
 
     def _send_static(self, rel_path: str) -> None:
         rel_path = urllib.parse.unquote(rel_path.lstrip("/"))
@@ -139,21 +241,38 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):  # noqa: N802
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path.rstrip("/") or "/"
-        body = self._read_json()
+        try:
+            body = self._read_json()
+        except OverflowError:
+            self._send_json(413, {"error": "Request body is too large"})
+            return
+        except ValueError:
+            self._send_json(400, {"error": "Invalid Content-Length"})
+            return
         if body is None:
             self._send_json(400, {"error": "Invalid JSON body"})
             return
 
         if path == "/api/auth/login":
+            limited, retry_after = self._login_rate_limited()
+            if limited:
+                self._send_json(
+                    429,
+                    {"error": "Too many login attempts. Try again later."},
+                    {"Retry-After": str(retry_after)},
+                )
+                return
             username = str(body.get("username", "")).strip()
             password = str(body.get("password", ""))
-            if not username or not password:
+            if not username or not password or len(username) > 64 or len(password) > 1024:
                 self._send_json(400, {"error": "Username and password required"})
                 return
             result = db.authenticate(username, password)
             if not result:
+                self._login_rate_limited(record_failure=True)
                 self._send_json(401, {"error": "Invalid credentials"})
                 return
+            self._login_rate_limited(success=True)
             self._send_json(200, result)
             return
 
@@ -169,11 +288,14 @@ class Handler(BaseHTTPRequestHandler):
             if not admin:
                 self._send_json(401, {"error": "Unauthorized"})
                 return
+            current_password = str(body.get("current_password", ""))
             new_password = str(body.get("new_password", ""))
-            if len(new_password) < 8:
-                self._send_json(400, {"error": "Password must be at least 8 characters"})
+            if len(new_password) < 12 or len(new_password) > 1024:
+                self._send_json(400, {"error": "Password must be between 12 and 1024 characters"})
                 return
-            db.change_password(admin["username"], new_password)
+            if not db.change_password(admin["username"], current_password, new_password):
+                self._send_json(403, {"error": "Current password is incorrect"})
+                return
             self._send_json(200, {"ok": True})
             return
 
@@ -187,6 +309,11 @@ class Handler(BaseHTTPRequestHandler):
             if section not in EDITABLE_SECTIONS or not isinstance(payload, dict):
                 self._send_json(400, {"error": "Invalid section or payload"})
                 return
+            if len(json.dumps(payload, ensure_ascii=False).encode("utf-8")) > 48 * 1024:
+                self._send_json(413, {"error": "Section content is too large"})
+                return
+            if section == "hero" and isinstance(payload.get("headline"), str):
+                payload["headline"] = _sanitize_headline(payload["headline"])
             db.save_section(section, payload)
             self._send_json(200, {"ok": True, "section": section})
             return
@@ -211,11 +338,22 @@ class Handler(BaseHTTPRequestHandler):
             if not name or not email or not message:
                 self._send_json(400, {"error": "Name, email and message are required"})
                 return
+            if len(name) > 120 or len(email) > 254 or len(subject) > 200:
+                self._send_json(400, {"error": "A contact field is too long"})
+                return
             if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
                 self._send_json(400, {"error": "Invalid email address"})
                 return
             if len(message) > 5000:
                 self._send_json(400, {"error": "Message is too long"})
+                return
+            limited, retry_after = self._contact_rate_limited()
+            if limited:
+                self._send_json(
+                    429,
+                    {"error": "Too many messages from this connection. Please try again later."},
+                    {"Retry-After": str(retry_after)},
+                )
                 return
             msg_id = db.add_message(name, email, subject, message)
             self._send_json(200, {"ok": True, "id": msg_id})
@@ -264,8 +402,7 @@ def run() -> None:
     print(f"  Admin:  http://localhost:{PORT}/admin.html")
     print(f"  Health: http://localhost:{PORT}/api/health")
     print("=" * 60)
-    print("  Default admin login:  admin / friengineers@2026")
-    print("  (Change it from the admin panel after first login!)")
+    print("  Admin credentials are configured through environment variables.")
     print("=" * 60)
     try:
         httpd.serve_forever()

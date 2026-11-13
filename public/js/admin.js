@@ -8,8 +8,11 @@
   const $ = (sel, root) => (root || document).querySelector(sel);
   const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
 
-  let token = localStorage.getItem("fe_token") || "";
-  let username = localStorage.getItem("fe_username") || "";
+  let token = sessionStorage.getItem("fe_token") || "";
+  let username = sessionStorage.getItem("fe_username") || "";
+  // Remove credentials persisted by older versions of the admin panel.
+  localStorage.removeItem("fe_token");
+  localStorage.removeItem("fe_username");
   let data = null;         // full content object
   let currentView = "hero"; // active section
   let dirty = false;
@@ -132,7 +135,12 @@
     opts = opts || {};
     const headers = Object.assign({ "Content-Type": "application/json" }, opts.headers || {});
     if (token) headers["Authorization"] = "Bearer " + token;
-    const res = await fetch(path, Object.assign({}, opts, { headers }));
+    let res;
+    try {
+      res = await fetch(path, Object.assign({}, opts, { headers }));
+    } catch (_) {
+      return { ok: false, status: 0, body: { error: "Could not connect to the server. Check your connection and try again." } };
+    }
     let body = {};
     try { body = await res.json(); } catch (_) {}
     return { ok: res.ok, status: res.status, body };
@@ -149,8 +157,8 @@
     if (res.ok) {
       token = res.body.token;
       username = res.body.username;
-      localStorage.setItem("fe_token", token);
-      localStorage.setItem("fe_username", username);
+      sessionStorage.setItem("fe_token", token);
+      sessionStorage.setItem("fe_username", username);
       enterApp();
     } else {
       const err = $("#loginError");
@@ -181,8 +189,8 @@
     api("/api/auth/logout", { method: "POST" }).catch(() => {});
     token = "";
     username = "";
-    localStorage.removeItem("fe_token");
-    localStorage.removeItem("fe_username");
+    sessionStorage.removeItem("fe_token");
+    sessionStorage.removeItem("fe_username");
     $("#app").hidden = true;
     $("#loginScreen").hidden = false;
     $("#loginPassword").value = "";
@@ -378,7 +386,7 @@
       '<div class="panel-desc">Signed in as <strong style="color:var(--cyan)">' + escapeHtml(username || "admin") + '</strong></div>' +
       '<div class="setting-block">' +
         '<div class="field"><label>Current Password</label><input type="password" id="curPass" autocomplete="current-password" /></div>' +
-        '<div class="field"><label>New Password (min 8 chars)</label><input type="password" id="newPass" autocomplete="new-password" /></div>' +
+        '<div class="field"><label>New Password (12 or more characters)</label><input type="password" id="newPass" autocomplete="new-password" minlength="12" maxlength="1024" /></div>' +
         '<div class="field"><label>Confirm New Password</label><input type="password" id="confirmPass" autocomplete="new-password" /></div>' +
         '<button class="btn btn-primary" id="changePassBtn">Update Password</button>' +
       '</div></div>' +
@@ -390,14 +398,15 @@
       const cur = $("#curPass").value;
       const nw = $("#newPass").value;
       const cf = $("#confirmPass").value;
-      if (nw.length < 8) { toast("New password must be at least 8 characters.", "err"); return; }
+      if (!cur) { toast("Enter your current password to continue.", "err"); return; }
+      if (nw.length < 12 || nw.length > 1024) { toast("Use a password between 12 and 1024 characters.", "err"); return; }
       if (nw !== cf) { toast("Passwords do not match.", "err"); return; }
       const r = await api("/api/admin/change-password", {
-        method: "POST", body: JSON.stringify({ new_password: nw })
+        method: "POST", body: JSON.stringify({ current_password: cur, new_password: nw })
       });
       if (r.ok) {
-        toast("Password updated.", "ok");
-        $("#curPass").value = ""; $("#newPass").value = ""; $("#confirmPass").value = "";
+        toast("Password updated. Please sign in again.", "ok");
+        logout();
       } else toast(r.body.error || "Could not update password.", "err");
     });
 
@@ -425,6 +434,7 @@
      Navigation & state
   ============================================================ */
   function switchView(view) {
+    if (dirty && view !== currentView && !window.confirm("You have unsaved changes. Leave this section and discard them?")) return;
     currentView = view;
     $$(".side-nav a").forEach(function (a) {
       a.classList.toggle("active", a.getAttribute("data-view") === view);
@@ -494,6 +504,9 @@
     } else {
       toast(res.body.error || "Save failed.", "err");
       setDirty(true);
+      const state = $("#saveState");
+      state.textContent = "Not saved. Your edits are still here.";
+      state.className = "save-state error";
     }
   }
 
@@ -544,9 +557,19 @@
     });
 
     $("#saveBtn").addEventListener("click", saveCurrent);
-    $("#logoutBtn").addEventListener("click", logout);
+    $("#logoutBtn").addEventListener("click", function () {
+      if (dirty && !window.confirm("You have unsaved changes. Log out and discard them?")) return;
+      logout();
+    });
     $("#menuToggle").addEventListener("click", function () {
       $("#sidebar").classList.toggle("open");
+    });
+
+    // Warn before a refresh or tab close would discard unsaved edits.
+    window.addEventListener("beforeunload", function (e) {
+      if (!dirty) return;
+      e.preventDefault();
+      e.returnValue = "";
     });
 
     // If already authenticated, go straight in.
