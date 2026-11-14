@@ -124,11 +124,24 @@ def init_db() -> None:
                 skills TEXT NOT NULL DEFAULT '[]',
                 email TEXT NOT NULL DEFAULT '',
                 phone TEXT NOT NULL DEFAULT '',
+                password_hash TEXT NOT NULL DEFAULT '',
                 created_at INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS employee_sessions (
+                token TEXT PRIMARY KEY,
+                employee_id INTEGER NOT NULL,
+                expires_at INTEGER NOT NULL,
+                created_at INTEGER NOT NULL,
+                FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE
+            );
             """
         )
+
+        employee_columns = {row[1] for row in conn.execute("PRAGMA table_info(employees)")}
+        if "password_hash" not in employee_columns:
+            conn.execute("ALTER TABLE employees ADD COLUMN password_hash TEXT NOT NULL DEFAULT ''")
 
         # Seed default content sections (only if missing).
         now = int(time.time())
@@ -373,6 +386,7 @@ def list_employees() -> list[dict]:
         for row in rows:
             employee = dict(row)
             employee["skills"] = json.loads(employee["skills"])
+            employee["has_account"] = bool(employee.pop("password_hash", ""))
             result.append(employee)
         return result
     finally:
@@ -414,6 +428,107 @@ def delete_employee(employee_id: int) -> bool:
         cur = conn.execute("DELETE FROM employees WHERE id=?", (employee_id,))
         conn.commit()
         return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
+def set_employee_password(employee_id: int, password: str) -> bool:
+    conn = _connect()
+    try:
+        cur = conn.execute(
+            "UPDATE employees SET password_hash=?,updated_at=? WHERE id=?",
+            (hash_password(password), int(time.time()), employee_id),
+        )
+        if cur.rowcount:
+            conn.execute("DELETE FROM employee_sessions WHERE employee_id=?", (employee_id,))
+            conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
+def authenticate_employee(email: str, password: str):
+    conn = _connect()
+    try:
+        row = conn.execute(
+            "SELECT id,password_hash FROM employees WHERE lower(email)=lower(?)", (email,)
+        ).fetchone()
+        if not row or not row["password_hash"] or not verify_password(password, row["password_hash"]):
+            verify_password(password, _DUMMY_PASSWORD_HASH)
+            return None
+        token = secrets.token_urlsafe(32)
+        now = int(time.time())
+        conn.execute("DELETE FROM employee_sessions WHERE expires_at < ? OR created_at < ?", (now, now - _SESSION_TTL))
+        conn.execute(
+            "INSERT INTO employee_sessions(token,employee_id,expires_at,created_at) VALUES (?,?,?,?)",
+            (hashlib.sha256(token.encode("utf-8")).hexdigest(), row["id"], now + _SESSION_TTL, now),
+        )
+        conn.commit()
+        return {"token": token, "employee_id": row["id"]}
+    finally:
+        conn.close()
+
+
+def session_employee(token: str):
+    conn = _connect()
+    try:
+        token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        row = conn.execute(
+            "SELECT employee_id,expires_at,created_at FROM employee_sessions WHERE token=?", (token_hash,)
+        ).fetchone()
+        if not row:
+            return None
+        now = int(time.time())
+        if row["expires_at"] < now or row["created_at"] + _SESSION_TTL < now:
+            conn.execute("DELETE FROM employee_sessions WHERE token=?", (token_hash,))
+            conn.commit()
+            return None
+        return {"id": row["employee_id"]}
+    finally:
+        conn.close()
+
+
+def logout_employee(token: str) -> None:
+    conn = _connect()
+    try:
+        token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        conn.execute("DELETE FROM employee_sessions WHERE token=?", (token_hash,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def update_employee_profile(employee_id: int, employee: dict):
+    conn = _connect()
+    try:
+        duplicate = conn.execute(
+            "SELECT id FROM employees WHERE lower(email)=lower(?) AND id<>? AND email<>''",
+            (employee["email"], employee_id),
+        ).fetchone() if employee["email"] else None
+        if duplicate:
+            return "duplicate_email"
+        cur = conn.execute(
+            "UPDATE employees SET name=?,title=?,bio=?,photo=?,university=?,skills=?,email=?,phone=?,updated_at=? WHERE id=?",
+            (employee["name"], employee["title"], employee["bio"], employee["photo"], employee["university"],
+             json.dumps(employee["skills"], ensure_ascii=False), employee["email"], employee["phone"],
+             int(time.time()), employee_id),
+        )
+        conn.commit()
+        return bool(cur.rowcount)
+    finally:
+        conn.close()
+
+
+def get_employee(employee_id: int):
+    conn = _connect()
+    try:
+        row = conn.execute("SELECT * FROM employees WHERE id=?", (employee_id,)).fetchone()
+        if not row:
+            return None
+        employee = dict(row)
+        employee["skills"] = json.loads(employee["skills"])
+        employee["has_account"] = bool(employee.pop("password_hash", ""))
+        return employee
     finally:
         conn.close()
 

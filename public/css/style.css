@@ -774,6 +774,20 @@ input, textarea { font: inherit; }
 .employee-contact { display: grid; gap: 5px; margin-top: 14px; font-size: .84rem; overflow-wrap: anywhere; }
 .employee-contact a { color: var(--muted); }
 .employee-contact a:hover { color: var(--cyan); }
+.employee-card h2 { font-family: var(--font-display); font-size: 1.15rem; margin-bottom: 4px; }
+.employee-portal { max-width: 920px; margin: 0 auto 36px; padding: 24px 28px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel); }
+.employee-portal h2 { font-family: var(--font-display); font-size: 1.2rem; }
+.employee-portal p { color: var(--muted); font-size: .9rem; }
+.employee-portal-head { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 18px; }
+.employee-portal-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.employee-login-form { max-width: 540px; }
+.employee-profile-form .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
+.employee-auth-message { min-height: 1.4em; margin-top: 8px; color: var(--cyan) !important; }
+@media (max-width: 640px) {
+  .employee-portal { padding: 20px 16px; }
+  .employee-portal-head { align-items: flex-start; flex-direction: column; }
+  .employee-profile-form .grid-2 { grid-template-columns: 1fr; }
+}
 
 /* ---------------- CONTACT ---------------- */
 .contact-grid {

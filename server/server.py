@@ -79,6 +79,40 @@ def _sanitize_headline(value):
     return "".join(parser.parts)
 
 
+def _normalize_employee(employee):
+    if not isinstance(employee, dict):
+        return None, "Employee data is required"
+    normalized = {}
+    for key in ("name", "title", "bio", "photo", "university", "email", "phone"):
+        value = employee.get(key, "")
+        if not isinstance(value, str):
+            return None, "Invalid employee field: " + key
+        normalized[key] = value.strip()
+    skills = employee.get("skills", [])
+    if not isinstance(skills, list) or any(not isinstance(skill, str) for skill in skills):
+        return None, "Skills must be a list of text values"
+    normalized["skills"] = [skill.strip() for skill in skills if skill.strip()]
+    limits = {"name": 120, "title": 120, "bio": 2000, "photo": 2048, "university": 200,
+              "email": 254, "phone": 40}
+    if not normalized["name"] or any(len(normalized[key]) > limit for key, limit in limits.items()):
+        return None, "Name is required and fields must be within their length limits"
+    if normalized["email"] and not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", normalized["email"]):
+        return None, "Invalid email address"
+    if len(normalized["skills"]) > 30 or any(len(skill) > 80 for skill in normalized["skills"]):
+        return None, "Skills must be limited to 30 items of 80 characters each"
+    if normalized["photo"]:
+        photo_url = urllib.parse.urlparse(normalized["photo"])
+        is_web_url = photo_url.scheme in ("http", "https") and bool(photo_url.netloc)
+        is_local_asset = (
+            not photo_url.scheme and not photo_url.netloc
+            and photo_url.path.startswith("/assets/")
+            and ".." not in photo_url.path.split("/")
+        )
+        if not (is_web_url or is_local_asset):
+            return None, "Photo must use an http/https URL or a local /assets/ path"
+    return normalized, None
+
+
 # --------------------------------------------------------------------------
 # Route table
 # --------------------------------------------------------------------------
@@ -96,7 +130,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header(
             "Content-Security-Policy",
             "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-            "font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; "
+            "font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; "
             "object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
         )
         super().end_headers()
@@ -203,6 +237,11 @@ class Handler(BaseHTTPRequestHandler):
             return None
         return db.session_admin(token)
 
+    def _require_employee(self):
+        auth = self.headers.get("Authorization", "")
+        token = auth[7:] if auth.startswith("Bearer ") else ""
+        return db.session_employee(token) if token else None
+
     # -- GET ----------------------------------------------------------------
     def do_GET(self):  # noqa: N802
         parsed = urllib.parse.urlparse(self.path)
@@ -241,6 +280,21 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(200, {"employees": [{key: employee[key] for key in public_fields} for employee in employees]})
             return
 
+        if path == "/api/employee/me":
+            employee_session = self._require_employee()
+            if not employee_session:
+                self._send_json(401, {"error": "Employee sign-in required"})
+                return
+            employee = db.get_employee(employee_session["id"])
+            if not employee:
+                self._send_json(401, {"error": "Employee profile no longer exists"})
+                return
+            employee.pop("created_at", None)
+            employee.pop("updated_at", None)
+            employee.pop("has_account", None)
+            self._send_json(200, {"employee": employee})
+            return
+
         if path == "/api/admin/employees":
             if not self._require_admin():
                 self._send_json(401, {"error": "Unauthorized"})
@@ -264,6 +318,55 @@ class Handler(BaseHTTPRequestHandler):
             return
         if body is None:
             self._send_json(400, {"error": "Invalid JSON body"})
+            return
+
+        if path == "/api/employee/auth/login":
+            limited, retry_after = self._login_rate_limited()
+            if limited:
+                self._send_json(429, {"error": "Too many sign-in attempts. Try again later."},
+                                {"Retry-After": str(retry_after)})
+                return
+            email = str(body.get("email", "")).strip()
+            password = str(body.get("password", ""))
+            if not email or not password or len(email) > 254 or len(password) > 1024:
+                self._send_json(400, {"error": "Email and password are required"})
+                return
+            result = db.authenticate_employee(email, password)
+            if not result:
+                self._login_rate_limited(record_failure=True)
+                self._send_json(401, {"error": "Invalid email or password"})
+                return
+            self._login_rate_limited(success=True)
+            self._send_json(200, result)
+            return
+
+        if path == "/api/employee/auth/logout":
+            employee_session = self._require_employee()
+            if employee_session:
+                db.logout_employee(self.headers.get("Authorization", "")[7:])
+            self._send_json(200, {"ok": True})
+            return
+
+        if path == "/api/employee/profile":
+            employee_session = self._require_employee()
+            if not employee_session:
+                self._send_json(401, {"error": "Employee sign-in required"})
+                return
+            normalized, error = _normalize_employee(body.get("employee"))
+            if error:
+                self._send_json(400, {"error": error})
+                return
+            if not normalized["email"]:
+                self._send_json(400, {"error": "A sign-in email is required on your profile"})
+                return
+            saved = db.update_employee_profile(employee_session["id"], normalized)
+            if saved == "duplicate_email":
+                self._send_json(409, {"error": "That email is already used by another employee"})
+                return
+            if not saved:
+                self._send_json(404, {"error": "Employee profile not found"})
+                return
+            self._send_json(200, {"ok": True})
             return
 
         if path == "/api/auth/login":
@@ -361,8 +464,14 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if normalized["photo"]:
                 photo_url = urllib.parse.urlparse(normalized["photo"])
-                if photo_url.scheme not in ("http", "https") or not photo_url.netloc:
-                    self._send_json(400, {"error": "Photo must use an http or https URL"})
+                is_web_url = photo_url.scheme in ("http", "https") and bool(photo_url.netloc)
+                is_local_asset = (
+                    not photo_url.scheme and not photo_url.netloc
+                    and photo_url.path.startswith("/assets/")
+                    and ".." not in photo_url.path.split("/")
+                )
+                if not (is_web_url or is_local_asset):
+                    self._send_json(400, {"error": "Photo must use an http/https URL or a local /assets/ path"})
                     return
             if len(normalized["skills"]) > 30 or any(len(skill) > 80 for skill in normalized["skills"]):
                 self._send_json(400, {"error": "Skills must be limited to 30 items of 80 characters each"})
@@ -371,10 +480,26 @@ class Handler(BaseHTTPRequestHandler):
             if employee_id is not None and (not isinstance(employee_id, int) or employee_id < 1):
                 self._send_json(400, {"error": "Invalid employee id"})
                 return
+            account_password = body.get("account_password", "")
+            if not isinstance(account_password, str):
+                self._send_json(400, {"error": "Employee password must be text"})
+                return
+            if account_password and not 12 <= len(account_password) <= 1024:
+                self._send_json(400, {"error": "Employee password must be between 12 and 1024 characters"})
+                return
+            if account_password and not normalized["email"]:
+                self._send_json(400, {"error": "Set an employee email before enabling their account"})
+                return
+            if normalized["email"] and any(e["email"].lower() == normalized["email"].lower() and e["id"] != employee_id
+                                            for e in db.list_employees()):
+                self._send_json(409, {"error": "That email is already used by another employee"})
+                return
             saved_id = db.save_employee(normalized, employee_id)
             if not saved_id:
                 self._send_json(404, {"error": "Employee not found"})
                 return
+            if account_password:
+                db.set_employee_password(saved_id, account_password)
             self._send_json(200, {"ok": True, "id": saved_id})
             return
 
