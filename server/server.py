@@ -235,6 +235,19 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(200, {"status": "ok", "service": "friengineers"})
             return
 
+        if path == "/api/employees":
+            employees = db.list_employees()
+            public_fields = ("id", "name", "title", "bio", "photo", "university", "skills", "email", "phone")
+            self._send_json(200, {"employees": [{key: employee[key] for key in public_fields} for employee in employees]})
+            return
+
+        if path == "/api/admin/employees":
+            if not self._require_admin():
+                self._send_json(401, {"error": "Unauthorized"})
+                return
+            self._send_json(200, {"employees": db.list_employees()})
+            return
+
         self._send_static(parsed.path)
 
     # -- POST ---------------------------------------------------------------
@@ -318,6 +331,53 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(200, {"ok": True, "section": section})
             return
 
+        if path == "/api/admin/employees":
+            if not self._require_admin():
+                self._send_json(401, {"error": "Unauthorized"})
+                return
+            employee = body.get("employee")
+            if not isinstance(employee, dict):
+                self._send_json(400, {"error": "Employee data is required"})
+                return
+            normalized = {}
+            for key in ("name", "title", "bio", "photo", "university", "email", "phone"):
+                value = employee.get(key, "")
+                if not isinstance(value, str):
+                    self._send_json(400, {"error": "Invalid employee field: " + key})
+                    return
+                normalized[key] = value.strip()
+            skills = employee.get("skills", [])
+            if not isinstance(skills, list) or any(not isinstance(skill, str) for skill in skills):
+                self._send_json(400, {"error": "Skills must be a list of text values"})
+                return
+            normalized["skills"] = [skill.strip() for skill in skills if skill.strip()]
+            limits = {"name": 120, "title": 120, "bio": 2000, "photo": 2048, "university": 200,
+                      "email": 254, "phone": 40}
+            if not normalized["name"] or any(len(normalized[key]) > limit for key, limit in limits.items()):
+                self._send_json(400, {"error": "Name is required and fields must be within their length limits"})
+                return
+            if normalized["email"] and not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", normalized["email"]):
+                self._send_json(400, {"error": "Invalid email address"})
+                return
+            if normalized["photo"]:
+                photo_url = urllib.parse.urlparse(normalized["photo"])
+                if photo_url.scheme not in ("http", "https") or not photo_url.netloc:
+                    self._send_json(400, {"error": "Photo must use an http or https URL"})
+                    return
+            if len(normalized["skills"]) > 30 or any(len(skill) > 80 for skill in normalized["skills"]):
+                self._send_json(400, {"error": "Skills must be limited to 30 items of 80 characters each"})
+                return
+            employee_id = body.get("id")
+            if employee_id is not None and (not isinstance(employee_id, int) or employee_id < 1):
+                self._send_json(400, {"error": "Invalid employee id"})
+                return
+            saved_id = db.save_employee(normalized, employee_id)
+            if not saved_id:
+                self._send_json(404, {"error": "Employee not found"})
+                return
+            self._send_json(200, {"ok": True, "id": saved_id})
+            return
+
         if path == "/api/admin/reset":
             admin = self._require_admin()
             if not admin:
@@ -368,6 +428,14 @@ class Handler(BaseHTTPRequestHandler):
         admin = self._require_admin()
         if not admin:
             self._send_json(401, {"error": "Unauthorized"})
+            return
+
+        match = re.match(r"^/api/admin/employees/(\d+)$", path)
+        if match:
+            if not db.delete_employee(int(match.group(1))):
+                self._send_json(404, {"error": "Employee not found"})
+                return
+            self._send_json(200, {"ok": True})
             return
 
         match = re.match(r"^/api/admin/messages/(\d+)$", path)

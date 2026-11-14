@@ -22,6 +22,9 @@ management backend. Engineered by friends, built on trust. 💙
   - Add / edit / remove list items (stats, values, services, projects…)
   - Contact-form message inbox with reply / delete
   - Change password & reset content to defaults
+- **Employee directory**
+  - Public read-only employee profiles with photo, graduation university, skills, email, and phone
+  - Administrators can add, edit, or remove profiles from the admin panel
 - **Contact form** that stores submissions in the database
 - **Zero dependencies** — pure Python standard library + SQLite. Nothing
   to install, nothing to break. Runs on any machine with Python 3.8+.
@@ -55,6 +58,7 @@ Then open:
 | What            | URL                        |
 |-----------------|----------------------------|
 | Website         | http://localhost:8080      |
+| Employee directory | http://localhost:8080/employees.html |
 | Admin panel     | http://localhost:8080/admin.html |
 | API             | http://localhost:8080/api/content |
 
@@ -64,6 +68,19 @@ Set `FRIENGINEERS_ADMIN_USER` and `FRIENGINEERS_ADMIN_PASSWORD` before the
 first start. Keep the password private and use a unique value of 12 or more
 characters. Existing databases with the old bundled password must set
 `FRIENGINEERS_ADMIN_PASSWORD` once to rotate it at startup.
+
+### Employee directory
+
+Sign in to the admin panel and open **Employees** in the sidebar to add, edit,
+or remove a profile. A profile can include the employee's name, photo URL,
+job title, bio, graduation university, skills, email, and phone number. Photo
+URLs must use `http://` or `https://`.
+
+Visitors can open `/employees.html` or choose **Employees** from the site
+navigation to view the directory. Visitors do not get controls to change
+profiles; all create, update, and delete requests require an administrator
+session. Employee email addresses and phone numbers are shown publicly when
+provided in a profile.
 
 ---
 
@@ -95,6 +112,7 @@ FRIENGINEERS_DB=/path/to.db python3 run.py   # custom database location
 | GET    | `/api/content/:section` | One section (e.g. `hero`)  |
 | POST   | `/api/contact`  | Submit contact form message       |
 | GET    | `/api/health`   | Health check                      |
+| GET    | `/api/employees` | Public, read-only employee directory |
 
 ### Admin (requires `Authorization: Bearer <token>`)
 
@@ -107,6 +125,9 @@ FRIENGINEERS_DB=/path/to.db python3 run.py   # custom database location
 | DELETE | `/api/admin/messages/:id`       | Delete a message       |
 | POST   | `/api/admin/change-password`    | Change admin password  |
 | POST   | `/api/admin/reset`              | Reset content defaults |
+| GET    | `/api/admin/employees`          | List employee profiles |
+| POST   | `/api/admin/employees`          | Add or update employee profile |
+| DELETE | `/api/admin/employees/:id`      | Delete employee profile |
 
 Example — update the hero section:
 
@@ -126,12 +147,14 @@ friengineers/
 ├── run.py                  # Launcher (start the site)
 ├── public/
 │   ├── index.html          # Main animated landing page
+│   ├── employees.html      # Public, read-only employee directory
 │   ├── admin.html          # Content management panel
 │   ├── css/
 │   │   ├── style.css       # Landing page styles
 │   │   └── admin.css       # Admin panel styles
 │   ├── js/
 │   │   ├── main.js         # Rendering + animations + contact form
+│   │   ├── employees.js    # Public employee directory rendering
 │   │   └── admin.js        # Admin logic (schema-driven editor)
 │   └── assets/
 │       └── favicon.svg

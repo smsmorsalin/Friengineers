@@ -113,6 +113,20 @@ def init_db() -> None:
                 created_at INTEGER NOT NULL,
                 read INTEGER NOT NULL DEFAULT 0
             );
+
+            CREATE TABLE IF NOT EXISTS employees (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                title TEXT NOT NULL DEFAULT '',
+                bio TEXT NOT NULL DEFAULT '',
+                photo TEXT NOT NULL DEFAULT '',
+                university TEXT NOT NULL DEFAULT '',
+                skills TEXT NOT NULL DEFAULT '[]',
+                email TEXT NOT NULL DEFAULT '',
+                phone TEXT NOT NULL DEFAULT '',
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            );
             """
         )
 
@@ -342,6 +356,62 @@ def delete_message(message_id: int) -> bool:
     conn = _connect()
     try:
         cur = conn.execute("DELETE FROM messages WHERE id=?", (message_id,))
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
+# --------------------------------------------------------------------------
+# Employee directory
+# --------------------------------------------------------------------------
+def list_employees() -> list[dict]:
+    conn = _connect()
+    try:
+        rows = conn.execute("SELECT * FROM employees ORDER BY name COLLATE NOCASE").fetchall()
+        result = []
+        for row in rows:
+            employee = dict(row)
+            employee["skills"] = json.loads(employee["skills"])
+            result.append(employee)
+        return result
+    finally:
+        conn.close()
+
+
+def save_employee(employee: dict, employee_id=None) -> int:
+    conn = _connect()
+    try:
+        now = int(time.time())
+        values = (
+            employee["name"], employee["title"], employee["bio"], employee["photo"],
+            employee["university"], json.dumps(employee["skills"], ensure_ascii=False),
+            employee["email"], employee["phone"], now,
+        )
+        if employee_id is None:
+            cur = conn.execute(
+                "INSERT INTO employees(name,title,bio,photo,university,skills,email,phone,created_at,updated_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?)", values[:8] + (now, now),
+            )
+            result = cur.lastrowid
+        else:
+            cur = conn.execute(
+                "UPDATE employees SET name=?,title=?,bio=?,photo=?,university=?,skills=?,email=?,phone=?,updated_at=? WHERE id=?",
+                values + (employee_id,),
+            )
+            if not cur.rowcount:
+                return 0
+            result = employee_id
+        conn.commit()
+        return result
+    finally:
+        conn.close()
+
+
+def delete_employee(employee_id: int) -> bool:
+    conn = _connect()
+    try:
+        cur = conn.execute("DELETE FROM employees WHERE id=?", (employee_id,))
         conn.commit()
         return cur.rowcount > 0
     finally:
