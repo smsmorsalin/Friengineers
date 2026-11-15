@@ -379,6 +379,70 @@
     });
   }
 
+  async function renderEmployees(editing) {
+    const content = $("#content");
+    const current = editing || {};
+    content.innerHTML = '<div class="panel"><div class="panel-title">Employee profile</div>' +
+      '<div class="panel-desc">Employees can edit only their own profile after signing in. Set a 12+ character password here to enable their account. Administrators can edit every profile.</div>' +
+      '<form id="employeeForm" class="employee-admin-form">' +
+      '<input type="hidden" id="employeeId" value="' + escapeHtml(current.id || "") + '" />' +
+      '<div class="grid-2">' +
+      '<div class="field"><label for="employeeName">Full name *</label><input id="employeeName" required maxlength="120" value="' + escapeHtml(current.name || "") + '" /></div>' +
+      '<div class="field"><label for="employeeTitle">Job title</label><input id="employeeTitle" maxlength="120" value="' + escapeHtml(current.title || "") + '" /></div>' +
+      '<div class="field"><label for="employeeUniversity">Graduated from</label><input id="employeeUniversity" maxlength="200" value="' + escapeHtml(current.university || "") + '" /></div>' +
+      '<div class="field"><label for="employeePhoto">Photo URL or local /assets/ path</label><input id="employeePhoto" maxlength="2048" placeholder="/assets/employee-photo.jpg or https://…" value="' + escapeHtml(current.photo || "") + '" /></div>' +
+      '<div class="field"><label for="employeeEmail">Email</label><input id="employeeEmail" type="email" maxlength="254" value="' + escapeHtml(current.email || "") + '" /></div>' +
+      '<div class="field"><label for="employeePhone">Phone number</label><input id="employeePhone" type="tel" maxlength="40" value="' + escapeHtml(current.phone || "") + '" /></div>' +
+      '</div><div class="field"><label for="employeeBio">Bio</label><textarea id="employeeBio" rows="4" maxlength="2000">' + escapeHtml(current.bio || "") + '</textarea></div>' +
+      '<div class="field"><label for="employeeSkills">Skills (comma separated)</label><input id="employeeSkills" value="' + escapeHtml((current.skills || []).join(", ")) + '" placeholder="Python, UI design, Project management" /></div>' +
+      '<div class="field"><label for="employeeAccountPassword">Employee login password (12+ characters)</label><input id="employeeAccountPassword" type="password" autocomplete="new-password" minlength="12" maxlength="1024" placeholder="Set or reset password; leave blank to keep current" /></div>' +
+      '<button class="btn btn-primary" type="submit">' + (current.id ? 'Save profile' : 'Add employee') + '</button>' +
+      (current.id ? ' <button class="btn btn-ghost" id="cancelEmployeeEdit" type="button">Cancel</button>' : '') +
+      '</form></div><div class="panel"><div class="panel-title">Employee directory</div><div id="employeeAdminList">Loading…</div></div>';
+
+    const form = $("#employeeForm");
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      const employee = {
+        name: $("#employeeName").value, title: $("#employeeTitle").value,
+        university: $("#employeeUniversity").value, photo: $("#employeePhoto").value,
+        email: $("#employeeEmail").value, phone: $("#employeePhone").value,
+        bio: $("#employeeBio").value,
+        skills: $("#employeeSkills").value.split(",").map((skill) => skill.trim()).filter(Boolean)
+      };
+      const id = $("#employeeId").value;
+      const result = await api("/api/admin/employees", {
+        method: "POST", body: JSON.stringify({ employee: employee, id: id ? Number(id) : undefined,
+          account_password: $("#employeeAccountPassword").value })
+      });
+      if (!result.ok) { toast(result.body.error || "Could not save employee.", "err"); return; }
+      toast("Employee profile saved.", "ok");
+      renderEmployees();
+    });
+    if ($("#cancelEmployeeEdit")) $("#cancelEmployeeEdit").addEventListener("click", () => renderEmployees());
+
+    const result = await api("/api/admin/employees");
+    const list = $("#employeeAdminList");
+    if (!result.ok) { list.innerHTML = '<div class="empty">Could not load employees.</div>'; return; }
+    const employees = result.body.employees || [];
+    if (!employees.length) { list.innerHTML = '<div class="empty">No employees added yet.</div>'; return; }
+    list.innerHTML = '<div class="employee-admin-list">' + employees.map((employee) =>
+      '<div class="employee-admin-row"><div><strong>' + escapeHtml(employee.name) + '</strong><div class="panel-desc">' + escapeHtml(employee.title || employee.university || "") + ' · ' + (employee.has_account ? 'Login enabled' : 'Login not set up') + '</div></div>' +
+      '<div><button class="btn btn-ghost btn-sm" data-edit-employee="' + employee.id + '">Edit</button> ' +
+      '<button class="btn btn-danger btn-sm" data-delete-employee="' + employee.id + '">Remove</button></div></div>'
+    ).join("") + '</div>';
+    $$('[data-edit-employee]', list).forEach((button) => button.addEventListener("click", () => {
+      const employee = employees.find((item) => item.id === Number(button.dataset.editEmployee));
+      renderEmployees(employee);
+    }));
+    $$('[data-delete-employee]', list).forEach((button) => button.addEventListener("click", async () => {
+      if (!confirm("Remove this employee profile?")) return;
+      const response = await api("/api/admin/employees/" + button.dataset.deleteEmployee, { method: "DELETE" });
+      if (response.ok) { toast("Employee removed.", "ok"); renderEmployees(); }
+      else toast(response.body.error || "Could not remove employee.", "err");
+    }));
+  }
+
   function renderSettings() {
     const content = $("#content");
     content.innerHTML =
@@ -440,6 +504,14 @@
       a.classList.toggle("active", a.getAttribute("data-view") === view);
     });
 
+    if (view === "employees") {
+      $("#viewTitle").textContent = "Employees";
+      $("#viewSub").textContent = "Manage employee profiles and public directory details.";
+      $("#saveBtn").style.display = "none";
+      $("#saveState").textContent = "";
+      renderEmployees();
+      return;
+    }
     if (view === "messages") {
       $("#viewTitle").textContent = "Messages";
       $("#viewSub").textContent = "Messages from the contact form.";
@@ -468,7 +540,7 @@
   }
 
   function markDirty() {
-    if (currentView === "messages" || currentView === "settings") return;
+    if (currentView === "messages" || currentView === "settings" || currentView === "employees") return;
     setDirty(true);
   }
 

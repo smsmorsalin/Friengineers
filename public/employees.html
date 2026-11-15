@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Meet the Friengineers team." />
+  <title>Employees — Friengineers</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <nav class="nav"><div class="nav-inner container">
+    <a class="brand" href="/"><span class="brand-mark">F</span><span class="brand-name">Friengineers</span></a>
+    <div class="nav-cta"><a href="/" class="btn btn-sm btn-ghost">Back to site</a></div>
+  </div></nav>
+  <main class="section" style="padding-top:120px;min-height:100vh">
+    <div class="container">
+      <div class="section-head"><span class="eyebrow">The people</span><h1 class="section-title">Our Employees</h1>
+        <p class="section-sub">Meet our team, their backgrounds and skills.</p></div>
+      <section id="employeePortal" class="employee-portal" aria-live="polite"></section>
+      <div class="team-grid" id="employeeGrid" aria-live="polite"><div class="empty">Loading employees…</div></div>
+    </div>
+  </main>
+  <script src="/js/employees.js"></script>
+</body>
+</html>
